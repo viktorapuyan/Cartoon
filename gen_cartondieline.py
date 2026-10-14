@@ -103,7 +103,7 @@ class DielineGeneratorApp:
         frame = ttk.Frame(self.left_panel)
         frame.pack(fill=tk.X, pady=5)
         ttk.Label(frame, text=label_text, width=12).pack(side=tk.LEFT)
-        entry = ttk.Entry(frame, textvariable=variable, width=10)
+        entry = ttk.Entry(frame, textvariable=variable, width=10, state="readonly")
         entry.pack(side=tk.RIGHT, expand=True, fill=tk.X)
 
     def get_dimensions(self):
