@@ -15,7 +15,7 @@ from pathlib import Path
 class ObjectDetector:
     """Object detector using YOLO model."""
     
-    def __init__(self, model_path: str = "camera2_segmodel.pt", conf_threshold: float = 0.50):
+    def __init__(self, model_path: str = "camera2_detectmodel.pt", conf_threshold: float = 0.50):
         """
         Initialize the object detector.
         
@@ -132,34 +132,6 @@ class ObjectDetector:
             # Draw bounding box
             cv2.rectangle(frame, (x1, y1), (x2, y2), color, 2)
             
-            # Prepare label text
-            label = f"{class_name}"
-            
-            # Get text size for background
-            (text_width, text_height), baseline = cv2.getTextSize(
-                label, cv2.FONT_HERSHEY_SIMPLEX, 0.5, 2
-            )
-            
-            # Draw background rectangle for text
-            cv2.rectangle(
-                frame,
-                (x1, y1 - text_height - baseline - 5),
-                (x1 + text_width, y1),
-                color,
-                -1
-            )
-            
-            # Draw text
-            cv2.putText(
-                frame,
-                label,
-                (x1, y1 - baseline - 5),
-                cv2.FONT_HERSHEY_SIMPLEX,
-                0.5,
-                (255, 255, 255),
-                2
-            )
-        
         return frame
     
     def _get_color_for_class(self, class_id: int) -> Tuple[int, int, int]:
