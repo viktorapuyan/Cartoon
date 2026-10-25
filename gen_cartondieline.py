@@ -72,13 +72,13 @@ class DielineGeneratorApp:
         ttk.Label(allowance_frame, text="Allowance:").pack(anchor=tk.W)
         ttk.Radiobutton(
             allowance_frame,
-            text="before 10mm",
+            text="Without allowance",
             variable=self.allowance_mode,
             value="before",
         ).pack(anchor=tk.W, pady=(4, 0))
         ttk.Radiobutton(
             allowance_frame,
-            text="with 10mm",
+            text="With allowance",
             variable=self.allowance_mode,
             value="with",
         ).pack(anchor=tk.W)
@@ -88,8 +88,8 @@ class DielineGeneratorApp:
         
 
         # Save Button
-        ttk.Button(self.left_panel, text="Fit to Screen", command=self.reset_scale).pack(fill=tk.X, pady=(10, 5))
-        ttk.Button(self.left_panel, text="Save as SVG", command=self.save_svg).pack(fill=tk.X, pady=(5, 5))
+        self.save_svg_button = ttk.Button(self.left_panel, text="Save as SVG", command=self.save_svg)
+        self._update_save_button_visibility()
 
         # --- Right Panel: Preview Canvas ---
         ttk.Label(self.right_panel, text="Layout Preview", style='Header.TLabel').pack(anchor=tk.W, pady=(0, 10))
@@ -103,7 +103,7 @@ class DielineGeneratorApp:
         frame = ttk.Frame(self.left_panel)
         frame.pack(fill=tk.X, pady=5)
         ttk.Label(frame, text=label_text, width=12).pack(side=tk.LEFT)
-        entry = ttk.Entry(frame, textvariable=variable, width=10)
+        entry = ttk.Entry(frame, textvariable=variable, width=10, state="readonly")
         entry.pack(side=tk.RIGHT, expand=True, fill=tk.X)
 
     def get_dimensions(self):
@@ -148,7 +148,14 @@ class DielineGeneratorApp:
                 self._updating_dimensions = False
         self.update_preview()
 
+    def _update_save_button_visibility(self):
+        if self.allowance_mode.get() == "with":
+            self.save_svg_button.pack(fill=tk.X, pady=(10, 5))
+        else:
+            self.save_svg_button.pack_forget()
+
     def _allowance_changed(self):
+        self._update_save_button_visibility()
         dimensions = self.get_dimensions()
         if dimensions is not None:
             previous_amount = ALLOWANCE_MM if self._previous_allowance_mode == "with" else 0
@@ -325,6 +332,8 @@ class DielineGeneratorApp:
         )
 
     def save_svg(self):
+        if self.allowance_mode.get() != "with":
+            return
         dims = self.get_dimensions()
         if not dims: 
             messagebox.showwarning("Warning", "Invalid dimensions.")

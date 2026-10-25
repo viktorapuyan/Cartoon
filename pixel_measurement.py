@@ -14,14 +14,9 @@ import numpy as np
 
 
 CAMERA_DISTANCE_CM = 30.0
-<<<<<<< HEAD
-REFERENCE_LENGTH_MM = 130.81
-# Click the reference endpoints to determine its pixel distance.
-=======
 REFERENCE_LENGTH_MM = 50.00
 REFERENCE_DISTANCE_PX = 221.00
 MM_PER_PIXEL = REFERENCE_LENGTH_MM / REFERENCE_DISTANCE_PX
->>>>>>> 4aacceebeb584361090bc4e5b19e92ee621845b0
 WINDOW_NAME = "Pixel Measurement Tool"
 SUPPORTED_EXTENSIONS = (".jpg", ".jpeg", ".png", ".bmp")
 
@@ -33,12 +28,9 @@ class PixelMeasurementTool:
         self.original_image: np.ndarray | None = None
         self.display_image: np.ndarray | None = None
         self.image_path: Path | None = None
-<<<<<<< HEAD
         self.reference_distance_px: float | None = None
         self.mm_per_pixel: float | None = None
         self.reference_points: list[tuple[int, int]] = []
-=======
->>>>>>> 4aacceebeb584361090bc4e5b19e92ee621845b0
         self.display_scale = 1.0
         self.display_width = 0
         self.display_height = 0
@@ -160,32 +152,12 @@ class PixelMeasurementTool:
         else:
             point_1, point_2 = self.current_points
             distance = self.calculate_distance(point_1, point_2)
-<<<<<<< HEAD
-            if distance == 0:
-                self.current_points = []
-                print("Select two different points.")
-                return
-            if self.mm_per_pixel is None:
-                self.reference_points = self.current_points.copy()
-                self.reference_distance_px = distance
-                self.mm_per_pixel = REFERENCE_LENGTH_MM / distance
-                self.current_points = []
-                print(f"Reference distance: {distance:.2f} px")
-                print(f"Conversion factor: {self.mm_per_pixel:.6f} mm/px")
-                print("Calibration complete. Click two points to measure an object.")
-                return
-=======
->>>>>>> 4aacceebeb584361090bc4e5b19e92ee621845b0
             measurement = {
                 "id": len(self.measurements) + 1,
                 "p1": point_1,
                 "p2": point_2,
                 "distance_px": distance,
-<<<<<<< HEAD
-                "distance_mm": self.mm_per_pixel * distance,
-=======
                 "distance_mm": MM_PER_PIXEL * distance,
->>>>>>> 4aacceebeb584361090bc4e5b19e92ee621845b0
             }
             self.measurements.append(measurement)
             print(f"\nMeasurement {measurement['id']}")
@@ -203,17 +175,6 @@ class PixelMeasurementTool:
         self.measurements.clear()
         self.reset_current_measurement()
 
-<<<<<<< HEAD
-    def reset_calibration(self) -> None:
-        """Clear measurements and select a new reference on the same image."""
-        self.clear_measurements()
-        self.reference_points = []
-        self.reference_distance_px = None
-        self.mm_per_pixel = None
-        print(f"Click the endpoints of the {REFERENCE_LENGTH_MM:.2f} mm reference.")
-
-=======
->>>>>>> 4aacceebeb584361090bc4e5b19e92ee621845b0
     def _draw_label(
         self,
         image: np.ndarray,
@@ -277,22 +238,6 @@ class PixelMeasurementTool:
                 thickness,
             )
 
-<<<<<<< HEAD
-        if len(self.reference_points) == 2:
-            reference_1, reference_2 = map(to_target, self.reference_points)
-            cv2.line(annotated, reference_1, reference_2, (0, 255, 0), thickness, cv2.LINE_AA)
-            draw_point(self.reference_points[0], "REF1")
-            draw_point(self.reference_points[1], "REF2")
-            self._draw_label(
-                annotated,
-                f"Reference: {REFERENCE_LENGTH_MM:.2f} mm / {self.reference_distance_px:.2f} px",
-                (reference_1[0] + 6, reference_1[1] + 25),
-                font_scale,
-                thickness,
-            )
-
-=======
->>>>>>> 4aacceebeb584361090bc4e5b19e92ee621845b0
         for measurement in self.measurements:
             point_1 = measurement["p1"]
             point_2 = measurement["p2"]
@@ -324,17 +269,8 @@ class PixelMeasurementTool:
     def _add_controls(self, image: np.ndarray) -> None:
         """Add keyboard instructions to the display image."""
         lines = [
-<<<<<<< HEAD
-            (
-                f"Calibration: click both ends of the {REFERENCE_LENGTH_MM:.2f} mm reference"
-                if self.mm_per_pixel is None
-                else f"Measuring: {self.mm_per_pixel:.6f} mm/px"
-            ),
-            "R: Reset points   C: Clear   K: Recalibrate   S: Save   ESC: Exit",
-=======
             "Left Click: Select Point",
             "R: Reset   C: Clear   S: Save   ESC: Exit",
->>>>>>> 4aacceebeb584361090bc4e5b19e92ee621845b0
         ]
         padding = 10
         line_height = 25
@@ -372,12 +308,6 @@ class PixelMeasurementTool:
 
     def run(self) -> None:
         """Run the image window until the user presses ESC."""
-<<<<<<< HEAD
-        if not math.isfinite(REFERENCE_LENGTH_MM) or REFERENCE_LENGTH_MM <= 0:
-            self._show_error("REFERENCE_LENGTH_MM must be a positive finite length in mm.")
-            return
-=======
->>>>>>> 4aacceebeb584361090bc4e5b19e92ee621845b0
         if not self.load_image() or self.original_image is None:
             return
 
@@ -388,14 +318,9 @@ class PixelMeasurementTool:
         print(f"Display scale: {self.display_scale:.6f}")
         print(f"Camera distance: {CAMERA_DISTANCE_CM:.1f} cm")
         print(f"Reference length: {REFERENCE_LENGTH_MM:.2f} mm")
-<<<<<<< HEAD
-        print("Click both endpoints of the reference to calibrate, then measure objects.")
-        print("Keep the reference and objects at the same distance from the camera.")
-=======
         print(f"Reference distance: {REFERENCE_DISTANCE_PX:.2f} px")
         print(f"Conversion factor: {MM_PER_PIXEL:.6f} mm/px")
         print("Click two points to measure their distance in pixels.")
->>>>>>> 4aacceebeb584361090bc4e5b19e92ee621845b0
 
         cv2.namedWindow(WINDOW_NAME, cv2.WINDOW_AUTOSIZE)
         cv2.setMouseCallback(WINDOW_NAME, self.mouse_callback)
@@ -412,11 +337,6 @@ class PixelMeasurementTool:
                     self.reset_current_measurement()
                 elif key in (ord("c"), ord("C")):
                     self.clear_measurements()
-<<<<<<< HEAD
-                elif key in (ord("k"), ord("K")):
-                    self.reset_calibration()
-=======
->>>>>>> 4aacceebeb584361090bc4e5b19e92ee621845b0
                 elif key in (ord("s"), ord("S")):
                     self.save_annotated_image()
         finally:

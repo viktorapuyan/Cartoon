@@ -8,6 +8,7 @@ import numpy as np
 
 from gen_cartondieline import DielineGeneratorApp
 from object_detector import ObjectDetector
+from segmentation_measurement import SegmentationMeasurement
 
 CAMERA_WIDTH = 640
 CAMERA_HEIGHT = 480
@@ -17,7 +18,7 @@ REFERENCE_DISTANCE_PX = 256.01
 MM_PER_PIXEL = REFERENCE_LENGTH_MM / REFERENCE_DISTANCE_PX
 DETECTION_CONFIDENCE = 0.50
 MEASUREMENT_SAMPLE_COUNT = 7
-BLOCKING_CLASSES = {'Not allowed', 'Undersize'}
+BLOCKING_CLASSES = {'Not allowed', 'Undersize', 'Oversize'}
 
 
 def resource_path(filename: str) -> Path:
@@ -49,6 +50,11 @@ class DualCameraApp:
         self.cap2 = None
         self.detector1 = None
         self.detector2 = None
+        self.segmentation_measurement = SegmentationMeasurement(
+            resource_path('camera1_segmodel.pt'),
+            resource_path('camera2_segmodel.pt'),
+            conf_threshold=DETECTION_CONFIDENCE,
+        )
         self.photo1 = None
         self.photo2 = None
         self.measurements_window = None
@@ -122,16 +128,12 @@ class DualCameraApp:
         )
         self.generate_btn.grid(row=0, column=1, padx=8)
 
-        self.measurements_label = ttk.Label(
-            outer, text='Measurements: not captured', style='Status.TLabel'
-        )
-        self.measurements_label.grid(row=4, column=0, pady=(0, 4))
-
         self.status_label = ttk.Label(
             outer, text='Ready - position the object 30.0 cm from both cameras, then capture',
-            style='Status.TLabel'
+            style='Status.TLabel', anchor=tk.CENTER
         )
-        self.status_label.grid(row=5, column=0, pady=(0, 2))
+        # Repaint the full row when a shorter status replaces the ready message.
+        self.status_label.grid(row=4, column=0, sticky='ew', pady=(0, 2))
 
     def _create_camera_panel(self, parent, camera_name, measurement_name, column):
         panel = tk.Frame(parent, bg='#ffffff', highlightthickness=1,
@@ -196,8 +198,8 @@ class DualCameraApp:
         return camera
 
     def _init_detectors(self):
-        self.detector1 = self._load_detector(resource_path('camera1_segmodel.pt'))
-        self.detector2 = self._load_detector(resource_path('camera2_segmodel.pt'))
+        self.detector1 = self._load_detector(resource_path('camera1_detectmodel.pt'))
+        self.detector2 = self._load_detector(resource_path('camera2_detectmodel.pt'))
 
     @staticmethod
     def _load_detector(model_path):
@@ -259,12 +261,14 @@ class DualCameraApp:
             self.capture_btn.configure(state=tk.DISABLED)
             self.generate_btn.configure(state=tk.DISABLED)
             self.status_label.configure(
-                text='Capture disabled while blocking object is visible',
+                text='Capture and Generate Dieline is disabled due to not allowed, undersize, or oversize object',
                 foreground='#c62828'
             )
 
             warning_class = (
-                'Not allowed' if 'Not allowed' in blocking_detection_classes else 'Undersize'
+                'Not allowed' if 'Not allowed' in blocking_detection_classes else
+                'Undersize' if 'Undersize' in blocking_detection_classes else
+                'Oversize'
             )
             warning_message = f'WARNING: {warning_class} object'
             if not self.warning_shown or warning_message != self.warning_message:
@@ -294,31 +298,30 @@ class DualCameraApp:
         window = tk.Toplevel(self.root)
         self.warning_window = window
         window.title('Warning')
-        window.geometry('360x150')
         window.resizable(False, False)
         window.transient(self.root)
         window.configure(bg='#fff4f4')
-        window.update_idletasks()
-        screen_width = window.winfo_screenwidth()
-        screen_height = window.winfo_screenheight()
-        window_width = window.winfo_width()
-        window_height = window.winfo_height()
-        position_x = (screen_width - window_width) // 2
-        position_y = (screen_height - window_height) // 2
-        window.geometry(f'{window_width}x{window_height}+{position_x}+{position_y}')
 
-        content = tk.Frame(window, bg='#fff4f4', padx=24, pady=22)
+        content = tk.Frame(window, bg='#fff4f4', padx=18, pady=14)
         content.pack(fill=tk.BOTH, expand=True)
         tk.Label(
             content, text=warning_message, bg='#fff4f4', fg='#c62828',
             font=('Segoe UI', 13, 'bold')
-        ).pack(pady=(0, 16))
-        ttk.Button(content, text='Close', command=window.destroy).pack()
+        ).pack()
+
+        window.update_idletasks()
+        window_width = window.winfo_reqwidth()
+        window_height = window.winfo_reqheight()
+        position_x = (window.winfo_screenwidth() - window_width) // 2
+        position_y = (window.winfo_screenheight() - window_height) // 2
+        window.geometry(f'{window_width}x{window_height}+{position_x}+{position_y}')
 
     def _has_measurements(self):
         return all(value is not None for value in (self.width, self.height, self.length))
 
     def capture_measurements(self):
+        if self.blocking_detection_active:
+            return
         if self.cap1 is None or not self.cap1.isOpened():
             messagebox.showwarning('Camera unavailable', 'Camera 1 is not available', parent=self.root)
             return
@@ -331,25 +334,43 @@ class DualCameraApp:
             return
 
         measurements = []
-        for _ in range(MEASUREMENT_SAMPLE_COUNT):
-            ret1, frame1 = self.cap1.read()
-            ret2, frame2 = self.cap2.read()
-            if not ret1 or not ret2:
-                continue
+        self.capture_btn.configure(state=tk.DISABLED)
+        self.status_label.configure(text='Running measurements...')
+        self.root.update_idletasks()
+        try:
+            self.segmentation_measurement.load_models()
+            for _ in range(MEASUREMENT_SAMPLE_COUNT):
+                ret1, frame1 = self.cap1.read()
+                ret2, frame2 = self.cap2.read()
+                if not ret1 or not ret2 or frame1 is None or frame2 is None:
+                    continue
 
-            _, detections1 = self.detector1.detect(frame1, draw_boxes=False)
-            _, detections2 = self.detector2.detect(frame2, draw_boxes=False)
-            if not detections1 or not detections2:
-                continue
+                _, detections1 = self.detector1.detect(frame1, draw_boxes=False)
+                _, detections2 = self.detector2.detect(frame2, draw_boxes=False)
+                blocking_classes = {
+                    detection['class_name']
+                    for detection in detections1 + detections2
+                    if detection['class_name'] in BLOCKING_CLASSES
+                }
+                if blocking_classes:
+                    self._update_safety_state(blocking_classes)
+                    return
 
-            x1, _, x2, _ = map(int, detections1[0]['bbox'])
-            length = (x2 - x1) * MM_PER_PIXEL
-            x1, y1, x2, y2 = map(int, detections2[0]['bbox'])
-            width = (x2 - x1) * MM_PER_PIXEL
-            height = (y2 - y1) * MM_PER_PIXEL
-            measurements.append((length, width, height))
+                sample = self.segmentation_measurement.measure(
+                    frame1, frame2, MM_PER_PIXEL
+                )
+                if sample is not None:
+                    measurements.append(sample)
+        except Exception as exc:
+            self.status_label.configure(text='Segmentation measurement failed', foreground='#c62828')
+            messagebox.showerror('Capture failed', str(exc), parent=self.root)
+            return
+        finally:
+            if not self.blocking_detection_active:
+                self.capture_btn.configure(state=tk.NORMAL)
 
         if not measurements:
+            self.status_label.configure(text='No valid segmentation measurements', foreground='#c62828')
             messagebox.showwarning(
                 'Capture failed',
                 'Could not collect a valid measurement sample. Keep the object visible in both cameras at a distance of 30.0 cm.',
@@ -360,10 +381,6 @@ class DualCameraApp:
         median_measurement = np.median(np.asarray(measurements), axis=0)
         self.length, self.width, self.height = median_measurement.tolist()
 
-        self.measurements_label.configure(
-            text=f'Length: {self.length:.2f} mm    Width: {self.width:.2f} mm    Height: {self.height:.2f} mm',
-            foreground='#176b3a'
-        )
         self._show_measurements_popup()
         self.status_label.configure(text='Measurements captured successfully', foreground='#176b3a')
         self.generate_btn.configure(state=tk.NORMAL)
