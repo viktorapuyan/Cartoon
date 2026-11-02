@@ -1,4 +1,4 @@
-# CartonIQ — Computer Vision-Based Product Measurement
+# Cartoon — Computer Vision-Based Product Measurement
 
 CartonIQ is a real-time computer vision system that automatically measures the dimensions of carton boxes and generates production-ready dieline patterns. It uses a dual-camera setup with YOLOv11 segmentation models and ArUco marker detection to accurately measure a box's width, height, and length, then instantly produces an RSC (Regular Slotted Container) dieline in SVG format.
 
