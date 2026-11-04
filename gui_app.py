@@ -13,12 +13,22 @@ from segmentation_measurement import SegmentationMeasurement
 CAMERA_WIDTH = 640
 CAMERA_HEIGHT = 480
 # Fixed calibration measured at a camera distance of 30.0 cm.
-REFERENCE_LENGTH_MM = 130.81
-REFERENCE_DISTANCE_PX = 256.01
+REFERENCE_LENGTH_MM = 50.00
+REFERENCE_DISTANCE_PX = 93.01
 MM_PER_PIXEL = REFERENCE_LENGTH_MM / REFERENCE_DISTANCE_PX
 DETECTION_CONFIDENCE = 0.50
 MEASUREMENT_SAMPLE_COUNT = 7
-BLOCKING_CLASSES = {'Not allowed', 'Undersize', 'Oversize'}
+BLOCKING_CLASSES = {'Not allowed', 'Undersize', 'Oversize', 'Undersized', 'Oversized'}
+
+
+def blocking_classes_for(detections):
+    """Map model size labels to the names used by the warning UI."""
+    aliases = {'Undersized': 'Undersize', 'Oversized': 'Oversize'}
+    return {
+        aliases.get(detection['class_name'], detection['class_name'])
+        for detection in detections
+        if detection['class_name'] in BLOCKING_CLASSES
+    }
 
 
 def resource_path(filename: str) -> Path:
@@ -219,11 +229,16 @@ class DualCameraApp:
             return None
 
     def _update_frames(self):
-        blocking_detection_classes = self._process_camera_frame(
+        camera1_blocking_classes = self._process_camera_frame(
             self.cap1, self.detector1, self.camera1_view, 1
         )
-        blocking_detection_classes |= self._process_camera_frame(
+        camera2_blocking_classes = self._process_camera_frame(
             self.cap2, self.detector2, self.camera2_view, 2
+        )
+        # Require both camera views to independently identify a blocking class.
+        blocking_detection_classes = (
+            camera1_blocking_classes | camera2_blocking_classes
+            if camera1_blocking_classes and camera2_blocking_classes else set()
         )
         self._update_safety_state(blocking_detection_classes)
         self.root.after(30, self._update_frames)
@@ -241,11 +256,7 @@ class DualCameraApp:
         blocking_detection_classes = set()
         if detector is not None:
             frame, detections = detector.detect(frame, draw_boxes=True)
-            blocking_detection_classes = {
-                detection['class_name']
-                for detection in detections
-                if detection['class_name'] in BLOCKING_CLASSES
-            }
+            blocking_detection_classes = blocking_classes_for(detections)
 
         photo = cv2_to_photoimage(frame)
         view.configure(image=photo, text='')
@@ -347,12 +358,10 @@ class DualCameraApp:
 
                 _, detections1 = self.detector1.detect(frame1, draw_boxes=False)
                 _, detections2 = self.detector2.detect(frame2, draw_boxes=False)
-                blocking_classes = {
-                    detection['class_name']
-                    for detection in detections1 + detections2
-                    if detection['class_name'] in BLOCKING_CLASSES
-                }
-                if blocking_classes:
+                blocking_classes1 = blocking_classes_for(detections1)
+                blocking_classes2 = blocking_classes_for(detections2)
+                if blocking_classes1 and blocking_classes2:
+                    blocking_classes = blocking_classes1 | blocking_classes2
                     self._update_safety_state(blocking_classes)
                     return
 
@@ -406,6 +415,8 @@ class DualCameraApp:
         ttk.Button(content, text='Close', command=window.destroy).pack(pady=(22, 0))
 
     def generate_dieline(self):
+        if self.blocking_detection_active:
+            return
         if not self._has_measurements():
             messagebox.showwarning('Missing measurements', 'Please capture measurements first.', parent=self.root)
             return

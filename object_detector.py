@@ -127,7 +127,7 @@ class ObjectDetector:
             x1, y1, x2, y2 = map(int, bbox)
             
             # Red for safety-blocking classes, palette color for everything else
-            if class_name in {"Not allowed", "Undersize", "Oversize"}:
+            if class_name in {"Not allowed", "Undersize", "Oversize", "Undersized", "Oversized"}:
                 color = (0, 0, 255)  # BGR red
             else:
                 color = self._get_color_for_class(det['class_id'])

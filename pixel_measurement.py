@@ -14,8 +14,8 @@ import numpy as np
 
 
 CAMERA_DISTANCE_CM = 30.0
-REFERENCE_LENGTH_MM = 50.00
-REFERENCE_DISTANCE_PX = 221.00
+REFERENCE_LENGTH_MM = 58.13
+REFERENCE_DISTANCE_PX = 120.00
 MM_PER_PIXEL = REFERENCE_LENGTH_MM / REFERENCE_DISTANCE_PX
 WINDOW_NAME = "Pixel Measurement Tool"
 SUPPORTED_EXTENSIONS = (".jpg", ".jpeg", ".png", ".bmp")
@@ -28,9 +28,6 @@ class PixelMeasurementTool:
         self.original_image: np.ndarray | None = None
         self.display_image: np.ndarray | None = None
         self.image_path: Path | None = None
-        self.reference_distance_px: float | None = None
-        self.mm_per_pixel: float | None = None
-        self.reference_points: list[tuple[int, int]] = []
         self.display_scale = 1.0
         self.display_width = 0
         self.display_height = 0
